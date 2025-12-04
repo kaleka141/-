@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Создай своё голосование</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 700px;
+      margin: 30px auto;
+      padding: 20px;
+      background-color: #fafafa;
+    }
+    h1, h2 {
+      text-align: center;
+      color: #333;
+    }
+    .section {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      margin-bottom: 25px;
+    }
+    input, button {
+      padding: 8px 12px;
+      margin: 5px;
+      font-size: 16px;
+    }
+    button {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .option-input {
+      display: flex;
+      gap: 8px;
+      margin: 6px 0;
+    }
+    .option-input input {
+      flex: 1;
+    }
+    #pollForm, #voteSection {
+      display: none;
+    }
+    .vote-option {
+      display: flex;
+      align-items: center;
+      margin: 10px 0;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 6px;
+    }
+    .vote-option input {
+      margin-right: 10px;
+    }
+    .bar-container {
+      margin: 12px 0;
+    }
+    .bar-label {
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+    .bar {
+      height: 20px;
+      background: #28a745;
+      border-radius: 4px;
+      width: 0%;
+      transition: width 0.5s ease;
+    }
+    .error {
+      color: #e74c3c;
+      text-align: center;
+      margin: 10px 0;
+    }
+    #newPollBtn {
+      display: block;
+      margin: 20px auto;
+      background-color: #6c757d;
+    }
+    #newPollBtn:hover {
+      background-color: #545b62;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Создай своё голосование</h1>
+
+  <!-- Этап 1: Создание опроса -->
+  <div id="createSection" class="section">
+    <h2>Создайте опрос</h2>
+    <div>
+      <label><strong>Вопрос:</strong></label><br>
+      <input type="text" id="pollQuestion" placeholder="Например: Ваш любимый цвет?" style="width: 100%;">
+    </div>
+    <div style="margin-top: 15px;">
+      <label><strong>Варианты ответов:</strong></label>
+      <div id="optionsContainer">
+        <div class="option-input">
+          <input type="text" placeholder="Вариант 1" required>
+        </div>
+        <div class="option-input">
+          <input type="text" placeholder="Вариант 2" required>
+        </div>
+      </div>
+      <button type="button" onclick="addOptionField()">+ Добавить вариант</button>
+    </div>
+    <div id="createError" class="error"></div>
+    <button type="button" onclick="createPoll()">Создать опрос</button>
+  </div>
+
+  <!-- Этап 2: Голосование и результаты -->
+  <div id="voteSection" class="section">
+    <h2 id="voteQuestion"></h2>
+    <form id="voteForm">
+      <div id="voteOptions"></div>
+      <div id="voteError" class="error"></div>
+      <button type="submit">Проголосовать</button>
+    </form>
+  </div>
+
+  <div id="resultsSection" class="section">
+    <h2>Результаты</h2>
+    <div id="results"></div>
+  </div>
+
+  <button id="newPollBtn" onclick="startNewPoll()">Начать новый опрос</button>
+
+  <script>
+    const POLL_KEY = "user_created_poll";
+    const VOTES_KEY = "user_poll_votes";
+
+    let pollData = null;
+
+    function addOptionField() {
+      const container = document.getElementById("optionsContainer");
+      const div = document.createElement("div");
+      div.className = "option-input";
+      div.innerHTML = `<input type="text" placeholder="Новый вариант" required>`;
+      container.appendChild(div);
+    }
+
+    function createPoll() {
+      const question = document.getElementById("pollQuestion").value.trim();
+      const inputs = document.querySelectorAll("#optionsContainer input");
+      const options = Array.from(inputs).map(inp => inp.value.trim()).filter(v => v);
+
+      const errorDiv = document.getElementById("createError");
+      errorDiv.textContent = "";
+
+      if (!question) {
+        errorDiv.textContent = "Введите вопрос!";
+        return;
+      }
+      if (options.length < 2) {
+        errorDiv.textContent = "Нужно минимум 2 варианта!";
+        return;
+      }
+
+      // Сохраняем опрос
+      pollData = { question, options };
+      localStorage.setItem(POLL_KEY, JSON.stringify(pollData));
+
+      // Инициализируем голоса
+      const votes = {};
+      options.forEach(opt => votes[opt] = 0);
+      localStorage.setItem(VOTES_KEY, JSON.stringify(votes));
+
+      // Переходим к голосованию
+      showVoteSection();
+    }
+
+    function showVoteSection() {
+      document.getElementById("createSection").style.display = "none";
+      document.getElementById("voteSection").style.display = "block";
+      document.getElementById("resultsSection").style.display = "block";
+      document.getElementById("newPollBtn").style.display = "block";
+
+      document.getElementById("voteQuestion").textContent = pollData.question;
+
+      const optionsDiv = document.getElementById("voteOptions");
+      optionsDiv.innerHTML = "";
+      pollData.options.forEach(opt => {
+        const div = document.createElement("div");
+        div.className = "vote-option";
+        div.innerHTML = `<label><input type="radio" name="voteChoice" value="${opt}"> ${opt}</label>`;
+        optionsDiv.appendChild(div);
+      });
+      
+      displayResults();
+    }
+
+    function displayResults() {
+      const votes = JSON.parse(localStorage.getItem(VOTES_KEY) || "{}");
+      const resultsDiv = document.getElementById("results");
+      const total = Object.values(votes).reduce((sum, v) => sum + v, 0);
+      
+      if (total === 0) {
+        resultsDiv.innerHTML = "<p>Пока никто не голосовал.</p>";
+        return;
+      }
+
+      let html = "";
+      pollData.options.forEach(opt => {
+        const count = votes[opt] || 0;
+        const percent = Math.round((count / total) * 100);
+        html += `
+          <div class="bar-container">
+            <div class="bar-label">${opt}: ${count} голос(ов)</div>
+            <div class="bar" style="width: ${percent}%"></div>
+            <div class="bar-percent">${percent}%</div>
+          </div>
+        `;
+      });
+      resultsDiv.innerHTML = html;
+    }
+
+    document.getElementById("voteForm").addEventListener("submit", function(e) {
+      e.preventDefault();
+      const selected = document.querySelector('input[name="voteChoice"]:checked');
+      const errorDiv = document.getElementById("voteError");
+      errorDiv.textContent = "";
+
+      if (!selected) {
+        errorDiv.textContent = "Выберите один вариант!";
+        return;
+      }
+
+      const votes = JSON.parse(localStorage.getItem(VOTES_KEY) || "{}");
+      votes[selected.value] = (votes[selected.value] || 0) + 1;
+      localStorage.setItem(VOTES_KEY, JSON.stringify(votes));
+
+      displayResults();
+      document.querySelectorAll('input[name="voteChoice"]').forEach(r => r.checked = false);
+      errorDiv.textContent = "Ваш голос учтён!";
+      setTimeout(() => errorDiv.textContent = "", 2000);
+    });
+
+    function startNewPoll() {
+      // Можно очистить данные (опционально):
+      // localStorage.removeItem(POLL_KEY);
+      // localStorage.removeItem(VOTES_KEY);
+      
+      document.getElementById("createSection").style.display = "block";
+      document.getElementById("voteSection").style.display = "none";
+      document.getElementById("resultsSection").style.display = "none";
+      document.getElementById("newPollBtn").style.display = "none";
+      
+      // Очистить поля формы
+      document.getElementById("pollQuestion").value = "";
+      const container = document.getElementById("optionsContainer");
+      container.innerHTML = `
+        <div class="option-input"><input type="text" placeholder="Вариант 1" required></div>
+        <div class="option-input"><input type="text" placeholder="Вариант 2" required></div>
+      `;
+    }
+
+    // При загрузке: если уже есть опрос — показываем его
+    window.addEventListener("load", () => {
+      const savedPoll = localStorage.getItem(POLL_KEY);
+      if (savedPoll) {
+        pollData = JSON.parse(savedPoll);
+        showVoteSection();
+        document.getElementById("newPollBtn").style.display = "block";
+      } else {
+        document.getElementById("createSection").style.display = "block";
+        document.getElementById("newPollBtn").style.display = "none";
+      }
+    });
+  </script>
+
+</body>
+</html>
